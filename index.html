@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Secure Login Card</title>
+<style>
+  /* Reset and base */
+  body, html {
+    margin: 0; padding: 0; height: 100%; width: 100%; 
+    overflow-x: hidden;
+    font-family: Arial, sans-serif;
+    background: #f9f9f9;
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none;   /* Safari */
+    -khtml-user-select: none;    /* Konqueror HTML */
+    -moz-user-select: none;      /* Firefox */
+    -ms-user-select: none;       /* Internet Explorer/Edge */
+    user-select: none;           /* Non-prefixed version */
+  }
+  
+  /* Prevent zoom */
+  html {
+    touch-action: manipulation;
+  }
+  /* Disable Ctrl+ or Ctrl- */
+  body {
+    -ms-content-zooming:none; 
+    -ms-touch-action:none;
+  }
+  @media only screen and (max-width: 600px) {
+    /* Not required for desktop but safe fallback */
+  }
+
+  /* Top image, full width */
+  #topImage {
+    width: 100vw;
+    height: auto;
+    max-height: 250px;
+    object-fit: cover;
+    user-select: none;
+    pointer-events: none;
+  }
+  
+  /* Container under image */
+  #loginContainer {
+    max-width: 400px;
+    margin: 20px auto;
+    padding: 10px 20px;
+    text-align: center;
+  }
+  
+  select, input[type=text], button {
+    font-size: 1rem;
+    padding: 10px;
+    margin: 6px 0;
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    user-select: text;
+  }
+  button {
+    cursor: pointer;
+    background: #0077cc;
+    color: white;
+    border: none;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+
+  #submitBtn {
+    display:none; /* hidden initially */
+  }
+
+  #errorMsg {
+    color: red;
+    height: 1.2em;
+    margin: 8px 0;
+    font-weight: bold;
+  }
+
+  /* Loading animation */
+  #loading {
+    display:none;
+    margin: 20px auto;
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #0077cc;
+    border-radius: 50%;
+    width: 50px; height: 50px;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg);}
+    100% { transform: rotate(360deg);}
+  }
+
+  /* Card container (flip) */
+  #cardContainer {
+    perspective: 1000px;
+    margin: 20px auto;
+    width: 340px;
+    height: 214.6px; /* approx 85.6mm x 53.98mm at 4px/mm */
+    display: none;
+    cursor: pointer;
+  }
+  
+  /* Flip card styles */
+  .card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    text-align: center;
+    transition: transform 0.8s;
+    transform-style: preserve-3d;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    border-radius: 8px;
+    user-select:none;
+  }
+
+  .card.is-flipped {
+    transform: rotateY(180deg);
+  }
+  
+  .card .side {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 8px;
+  }
+  
+  .card .front {
+    background: white;
+  }
+  .card .back {
+    background: white;
+    transform: rotateY(180deg);
+  }
+
+  .card img {
+    border-radius: 8px;
+    width: 100%;
+    height: 100%;
+    user-select:none;
+    pointer-events:none;
+  }
+
+  /* Footer styles */
+  footer {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #444;
+    margin: 40px auto 20px auto;
+    user-select:none;
+  }
+  footer p {
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top image, customizable -->
+<img id="topImage" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiHHSdzBBAKyMzj6x2mR6MRVexUvwW8XqrbmiFFZf17jpuqd3SlIjBSYVkDlKQvMRMRdqAYAOo81-xPR4nbLHGyp0Rg6hzxpfi6Rl9YJtV3M2NBAPG3X_5E0U4ySTCQOA2WtEx0UgC6o8ELCEXOe0kdvY1dC-k0VZUNznQJ-2AeKhSk9oq1X8MsM6oyp9o/s1600/INDIAN%20ARMED%20FORCES.jpg" alt="Header Image" />
+
+<div id="loginContainer">
+  <select id="loginType" aria-label="Select login type">
+    <option value="defence">DEFENCE ID</option>
+    <option value="csd">CSD SMART CARD</option>
+  </select>
+
+  <input id="loginInput" type="text" autocomplete="off" placeholder="Enter DEFENCE ID" aria-label="Login ID input">
+
+  <div id="errorMsg" aria-live="polite"></div>
+
+  <button id="submitBtn" type="button">Submit</button>
+</div>
+
+<div id="loading" role="alert" aria-live="assertive" aria-busy="true" aria-label="Loading animation"></div>
+
+<div id="cardContainer" aria-live="polite" aria-label="ID card display">
+  <div class="card" id="flipCard" tabindex="0" role="button" aria-pressed="false">
+    <div class="side front">
+      <!-- Front image changes by login type -->
+      <img id="frontImage" src="" alt="Front side of card" />
+    </div>
+    <div class="side back">
+      <!-- Back image changes by login type -->
+      <img id="backImage" src="" alt="Back side of card" />
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p> © 2025 Indian Army. This is the Official Indian Army Web Portal, maintained & managed by the Indian Army. Site hosted by NIC.</p>
+
+ <p><a href="https://www.indianarmy.nic.in/">Back To Homepage</a></p>
+</footer>
+
+<script>
+  // Configurable IDs and images
+  const validIDs = {
+    defence: 'IC80129D',
+    csd: 'GA05092445831275T00'
+  };
+
+  // Images for front and back card sides for each type
+  const cardImages = {
+    defence: {
+      front: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjACrj2xE8xy59DaTKD5ImIeaNkf6yNRY9gAYQX8Zy-jtY7CkSoanPn0Vn8qRbp1rM4xsxFT5-zFtUX3bjmPYCmaXyiZxpF7ANPKW4QB4o_TE7rewqI95ARIyR4wE07xBaRki1aTXChdAlt9CWl-dNGLzZsR4Uuhtenb2maTBToAUz45dy0jy1V1UWw3rI/s3175/Lt.%20Col.%20A.%20K.%20Sharma%20Commanding%20Officer%20Unit%205th%20Battalion,%20Dogra%20Regiment.jpg',
+      back: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj1QJIc9ATAuFBQEwVa15HPpQZLWYlDTXTSM6tEL5PsCATO449DzejDp9l2Ww326_2gt5S6_0JxVgwRCXgtiE3TmXMNapmeMhgh5XDn4pm461405bVsBwnbSHCchkNR2qzbEgK_FcFECoaqnLtpWB6Oec1Su9SuujTRBrvI9N1T5JzTqlpG34hGkMPCjNI/s3175/Lt.%20Col.%20A.%20K.%20Sharma%20Commanding%20Officer%20Unit%205th%20Battalion,%20Dogra%20Regiment.zip%20-%208.jpeg'
+    },
+    csd: {
+      front: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgUcAajjbQcgbaSJdrCfcdKuxGk8LPvUTge8cvIHxdHhd_BqMaETiS03rumi9FZImLFhdbLQSy3oBwE_OmoXbDEOtKmKk1BK-dcWU5dsULBWz2RD9SH08BL9ARPf-XBl4uWnMoOEEUogZLXAhW-lJ5CUBxLXYs539nX7k1uLpidxhsPPoi03nPmt6tdcDM/s3166/%E0%A4%95%E0%A5%88%E0%A4%A8%E0%A5%8D%E0%A4%9F%E0%A5%80%E0%A4%A8%20%E0%A4%B8%E0%A5%8D%E0%A4%AE%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%9F%20%E0%A4%95%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%A1.zip%20-%207.jpeg',
+      back: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhZNEkjFGNtiadvvfDpo_jpkprxUPxbhsUcD7pYrKamq4pBeFe7u-ItNP9P73iyxX7k4SH6TAblkbYBcqpOfEXpxBMc9yvTLv0PnLoqgwKiAE0dbso-DltvJYBEmhgI-cirSSCOy5es7RyQWbrNCEPjS0FEdKhshRvWrB6KWBLfCAZfxNB4dfgntxZIUmg/s3166/%E0%A4%95%E0%A5%88%E0%A4%A8%E0%A5%8D%E0%A4%9F%E0%A5%80%E0%A4%A8%20%E0%A4%B8%E0%A5%8D%E0%A4%AE%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%9F%20%E0%A4%95%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%A1.zip%20-%208.jpeg'
+    }
+  };
+
+  const loginTypeSelect = document.getElementById('loginType');
+  const loginInput = document.getElementById('loginInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const errorMsg = document.getElementById('errorMsg');
+  const loading = document.getElementById('loading');
+  const cardContainer = document.getElementById('cardContainer');
+  const flipCard = document.getElementById('flipCard');
+  const frontImage = document.getElementById('frontImage');
+  const backImage = document.getElementById('backImage');
+
+  // Update input placeholder on dropdown change
+  function updatePlaceholder() {
+    if(loginTypeSelect.value === 'defence') {
+      loginInput.placeholder = 'Enter DEFENCE ID';
+    } else {
+      loginInput.placeholder = 'Enter CSD SMART CARD';
+    }
+    loginInput.value = '';
+    submitBtn.style.display = 'none';
+    errorMsg.textContent = '';
+  }
+
+  loginTypeSelect.addEventListener('change', updatePlaceholder);
+
+  // Show submit button only if input matches pattern length
+  loginInput.addEventListener('input', () => {
+    const inputVal = loginInput.value.trim();
+    if(loginTypeSelect.value === 'defence' && inputVal.length > 0) {
+      submitBtn.style.display = 'block';
+    } else if(loginTypeSelect.value === 'csd' && inputVal.length > 0) {
+      submitBtn.style.display = 'block';
+    } else {
+      submitBtn.style.display = 'none';
+    }
+  });
+
+  // Show error for 2 seconds
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    setTimeout(() => {
+      errorMsg.textContent = '';
+    }, 2000);
+  }
+
+  // Flip card toggle
+  flipCard.addEventListener('click', () => {
+    flipCard.classList.toggle('is-flipped');
+    let pressed = flipCard.getAttribute('aria-pressed') === 'true';
+    flipCard.setAttribute('aria-pressed', (!pressed).toString());
+  });
+  // Also allow keyboard toggle
+  flipCard.addEventListener('keypress', (e) => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      flipCard.click();
+    }
+  });
+
+  // Submit button click handler
+  submitBtn.addEventListener('click', () => {
+    const inputVal = loginInput.value.trim();
+    if(loginTypeSelect.value === 'defence') {
+      if(inputVal !== validIDs.defence) {
+        showError('Invalid DEFENCE ID');
+        return;
+      }
+    } else {
+      if(inputVal !== validIDs.csd) {
+        showError('Invalid CSD SMART CARD');
+        return;
+      }
+    }
+    // Clear error
+    errorMsg.textContent = '';
+    // Hide form elements, show loading
+    loginContainer.style.display = 'none';
+    loading.style.display = 'block';
+
+    // After 3 seconds, hide loading and show card
+    setTimeout(() => {
+      loading.style.display = 'none';
+      showCard(loginTypeSelect.value);
+    }, 3000);
+  });
+
+  // Download toggle state: true means next click downloads front, false means back
+  let downloadFrontNext = true;
+
+  // Create a download button and insert below the card container
+  const downloadBtn = document.createElement('button');
+  downloadBtn.id = 'downloadBtn';
+  downloadBtn.textContent = 'Download Image';
+  downloadBtn.style.marginTop = '10px';
+  downloadBtn.style.padding = '8px 16px';
+  downloadBtn.style.fontSize = '1rem';
+  downloadBtn.style.borderRadius = '4px';
+  downloadBtn.style.border = 'none';
+  downloadBtn.style.backgroundColor = '#0077cc';
+  downloadBtn.style.color = 'white';
+  downloadBtn.style.cursor = 'pointer';
+  downloadBtn.style.display = 'none'; // hide initially
+
+  cardContainer.after(downloadBtn);
+
+  // Update download button visibility based on card shown
+  function updateDownloadButtonVisibility(show) {
+      downloadBtn.style.display = show ? 'inline-block' : 'none';
+      downloadFrontNext = true; // reset to front on showing card
+  }
+
+  // Event listener for download button
+  downloadBtn.addEventListener('click', () => {
+      let imgToDownload = downloadFrontNext ? frontImage : backImage;
+      if(!imgToDownload.src) return;
+
+      // Create a temporary link to download the image
+      const link = document.createElement('a');
+
+      // Prepare a canvas to get exact image display size and content
+      const canvas = document.createElement('canvas');
+      const img = imgToDownload;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+
+      try {
+        const imageObj = new Image();
+        imageObj.crossOrigin = "anonymous";
+        imageObj.onload = function() {
+          ctx.drawImage(imageObj, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = (loginTypeSelect.value === 'defence' ? 'DEFENCE_ID_' : 'CSD_SMART_CARD_') + (downloadFrontNext ? 'front.jpg' : 'back.jpg');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }, 'image/jpeg');
+        };
+        imageObj.onerror = function() {
+          // Fallback: direct download from src
+          link.href = img.src;
+          link.download = (loginTypeSelect.value === 'defence' ? 'DEFENCE_ID_' : 'CSD_SMART_CARD_') + (downloadFrontNext ? 'front.jpg' : 'back.jpg');
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+        imageObj.src = img.src;
+      } catch(e) {
+        link.href = img.src;
+        link.download = (loginTypeSelect.value === 'defence' ? 'DEFENCE_ID_' : 'CSD_SMART_CARD_') + (downloadFrontNext ? 'front.jpg' : 'back.jpg');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Toggle for next click
+      downloadFrontNext = !downloadFrontNext;
+  });
+
+  // Show card for given login type
+  function showCard(type) {
+    cardContainer.style.display = 'block';
+    flipCard.classList.remove('is-flipped');
+    flipCard.setAttribute('aria-pressed', 'false');
+    frontImage.src = cardImages[type].front;
+    backImage.src = cardImages[type].back;
+    updateDownloadButtonVisibility(true);
+  }
+
+  // Disable right click, context menu to prevent saving etc.
+  window.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Disable keyboard shortcuts Ctrl+U, Ctrl+S, Ctrl+Shift+I
+  window.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i'))) {
+      e.preventDefault();
+    }
+  });
+
+  // Disable copy, cut, paste events globally
+  document.addEventListener('copy', e => e.preventDefault());
+  document.addEventListener('cut', e => e.preventDefault());
+  document.addEventListener('paste', e => e.preventDefault());
+
+  // Prevent zoom on Ctrl+ scroll or pinch
+  document.addEventListener('wheel', function(e){
+    if(e.ctrlKey) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  document.addEventListener('touchmove', function(e){
+    if(e.scale !== 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Make screenshots black by covering all with a black overlay on print and screenshot
+  function addBlackOverlay(){
+    let overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = 0; overlay.style.left = 0;
+    overlay.style.width = '100vw'; overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'black';
+    overlay.style.zIndex = 999999;
+    overlay.style.pointerEvents = 'none';
+    document.body.appendChild(overlay);
+    setTimeout(() => { document.body.removeChild(overlay); }, 1000);
+  }
+  document.addEventListener('keydown', e => {
+    // Detect PrintScreen key (PrtSc)
+    if(e.key === 'PrintScreen' || e.key === 'Snapshot' || e.keyCode === 44){
+      addBlackOverlay();
+    }
+  });
+
+  // No zoom by meta or ctrl
+  window.addEventListener('keydown', function(e){
+    if((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '_')){
+      e.preventDefault();
+    }
+  });
+
+
+  // Initialize placeholder
+  updatePlaceholder();
+</script>
+
+</body>
+</html>
